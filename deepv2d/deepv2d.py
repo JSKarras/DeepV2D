@@ -411,8 +411,7 @@ class DeepV2D:
 
                     self.depths[i:i+s] = self.sess.run(self.outputs['depths'], feed_dict=feed_dict)
 
-
-    def vizualize_output(self, inds=[0]):
+    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray'):
         feed_dict = {
             self.images_placeholder: self.images,
             self.depths_placeholder: self.depths,
@@ -422,9 +421,31 @@ class DeepV2D:
         keyframe_image = self.images[0]
         keyframe_depth = self.depths[0]
 
-        image_depth = vis.create_image_depth_figure(keyframe_image, keyframe_depth)
+        # convert to disparity
+        vinds = keyframe_depth>0
+        depth = 1./(keyframe_depth + 1)
+
+        z1 = np.percentile(depth[vinds], pc)
+        z2 = np.percentile(depth[vinds], 100-pc)
+
+        depth = (depth - z2) / (z1 - z2)
+        depth = np.clip(depth, 0, 1)
+
+        # Convert gray to rgb
+        cmap = plt.get_cmap(cmap)
+        rgba_img = cmap(depth.astype(np.float32))
+        rgb_img = np.delete(rgba_img, 3, 2)
+        depth = rgb_img
+
+        keep_H = int(depth.shape[0] * (1-crop_percent))
+        image_depth = 255 * depth[:keep_H]
+
+        # Create image depth figure
+        figure = np.concatenate([keyframe_image, image_depth], axis=1)
+
+        # Save
         cv2.imwrite('depth.png', image_depth[:, image_depth.shape[1]//2:])
-        cv2.imshow('image_depth', image_depth/255.0)
+        #cv2.imshow('image_depth', image_depth/255.0)
         
         print("Press any key to cotinue")
         cv2.waitKey()
@@ -432,8 +453,8 @@ class DeepV2D:
         # use depth map to create point cloud
         point_cloud, point_colors = self.sess.run(self.outputs['point_cloud'], feed_dict=feed_dict)
 
-        print("Press q to exit")
-        vis.visualize_prediction(point_cloud, point_colors, self.poses)
+        #print("Press q to exit")
+        #vis.visualize_prediction(point_cloud, point_colors, self.poses)
 
 
     def __call__(self, images, intrinsics=None, iters=5, viz=False):
