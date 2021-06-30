@@ -384,7 +384,7 @@ class DeepV2DSLAM_KITTI:
             self.queue.put((None, keyframe_pose))
 
     
-    def display_keyframes(self):
+    def display_keyframes(self, index):
         """ display image / depth keyframe pairs """
         def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='gray'):
             # convert to disparity
@@ -410,7 +410,6 @@ class DeepV2DSLAM_KITTI:
             figure = np.concatenate([keyframe_image, image_depth], axis=1)
             return figure
 
-        idx = 0
         if len(self.keyframe_inds) > 0:
             image_stack = []
             for keyframe_index in self.keyframe_inds:
@@ -419,14 +418,13 @@ class DeepV2DSLAM_KITTI:
 
                 image_and_depth = get_depth_image(keyframe_image, keyframe_depth)
                 image_stack.append(image_and_depth)
-
             image_stack = np.concatenate(image_stack, axis=0)
             if len(self.keyframe_inds) > 1:
                 image_stack = cv2.resize(image_stack, None, fx=0.5, fy=0.5)
-
             #cv2.imshow('keyframes', image_stack / 255.0)
-            cv2.imwrite('/content/keyframes/keyframe_'+str(idx), image_stack / 255.0)
-            idx += 1
+
+            print('Writing keyframe_'+str(index)+'.png')
+            cv2.imwrite('/content/keyframes/keyframe_'+str(index)+'.png', image_stack)
             cv2.waitKey(10)
 
     def track(self, image):
@@ -520,5 +518,5 @@ class DeepV2DSLAM_KITTI:
                     self.update_depths()
 
             
-        self.display_keyframes()
+        self.display_keyframes(index=len(self.images))
         self.index += 1

@@ -30,7 +30,7 @@ def main(args):
         model = 'models/kitti.ckpt'
         slam = DeepV2DSLAM_KITTI(cfg, model, n_keyframes=args.n_keyframes)
 
-        dataset_dir = '/media/datadrive/data/KITTI/raw'
+        dataset_dir = '/content/drive/MyDrive/Colab Notebooks/Depth Estimation/DeepV2D/'
         db = KittiRaw(dataset_dir)
 
         if args.sequence is None:
@@ -67,7 +67,10 @@ def main(args):
         slam.set_session(sess)
         slam.start_visualization(args.cinematic, args.render_path, args.clear_points)
 
+        idx = 0
         for (image, intrinsics) in db.iterate_sequence(args.sequence):
+            print("image ", idx, "/", len(args.sequence))
+            idx += 1
             slam(image, intrinsics)
 
 
