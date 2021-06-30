@@ -68,14 +68,17 @@ def load_video(video_file, n_frames=8):
 
 def main(args):
     cfg = config.cfg_from_file(args.cfg)
+  
     with tf.Session() as sess:
         images = load_video(args.video)
         deepv2d = DeepV2D(cfg, args.model, mode=args.mode, image_dims=[None, images.shape[1], images.shape[2]],
         use_fcrn=True, is_calibrated=False, use_regressor=False)
         deepv2d.set_session(sess)
-        for i in range(args.n_frames):
+        for i in range(args.n_frames//8):
+          start_idx = 8*i
+          print("Frames Batch #", i+1, ": frames ", start_idx, " - ", start_idx+7)
           images = load_video(args.video)
-          depths, poses = deepv2d(images, viz=True, iters=args.n_iters)
+          depths, poses = deepv2d(images, viz=True, iters=args.n_iters, start_idx=start_idx)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

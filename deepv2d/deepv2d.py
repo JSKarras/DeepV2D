@@ -438,7 +438,7 @@ class DeepV2D:
         figure = np.concatenate([keyframe_image, image_depth], axis=1)
         return figure
 
-    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray'):
+    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray', start_idx=0):
         feed_dict = {
             self.images_placeholder: self.images,
             self.depths_placeholder: self.depths,
@@ -481,10 +481,10 @@ class DeepV2D:
         # Save all images
         dir = '/content/video_frames/'
         for i in range(len(self.images)):
-          print('Writing depth image '+str(i)+'...')
+          print('Writing depth image '+str(start_idx+i)+'...')
           image, depth = self.images[i], self.depths[i]
           depth_image = get_depth_image(image, depth)
-          cv2.imwrite(dir+'depth_'+str(i)+'.png', depth_image[:, depth_image.shape[1]//2:])
+          cv2.imwrite(dir+'depth_'+str(start_idx+i)+'.png', depth_image[:, depth_image.shape[1]//2:])
 
         print("Press any key to cotinue")
         cv2.waitKey()
@@ -496,7 +496,7 @@ class DeepV2D:
         #vis.visualize_prediction(point_cloud, point_colors, self.poses)
 
 
-    def __call__(self, images, intrinsics=None, iters=5, viz=False):
+    def __call__(self, images, intrinsics=None, iters=5, viz=False, start_idx=0):
         n_frames = len(images)
         self.images = np.stack(images, axis=0)
 
@@ -524,7 +524,7 @@ class DeepV2D:
             self.update_depths()
 
         if viz:
-            self.vizualize_output()
+            self.vizualize_output(start_idx=start_idx)
 
         return self.depths, self.poses
 
