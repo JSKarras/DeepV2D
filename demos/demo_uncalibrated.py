@@ -17,7 +17,7 @@ from deepv2d import DeepV2D
 
 
 
-def load_video(video_file, n_frames=7):
+def load_video(video_file, n_frames=8):
     cap = cv2.VideoCapture(args.video)
 
     # Check if camera opened successfully
@@ -34,7 +34,7 @@ def load_video(video_file, n_frames=7):
 
         if ret:
             if count % rate == 0:
-                cv2.imshow("image", img)
+                #cv2.imshow("image", img)
                 cv2.waitKey(100)
 
                 img = cv2.resize(img, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_AREA)
@@ -53,7 +53,7 @@ def load_video(video_file, n_frames=7):
 
         count += 1
 
-        if len(images) >= 8:
+        if len(images) >= n_frames:
             break
 
     keyframe_index = len(images) // 2
@@ -67,20 +67,17 @@ def load_video(video_file, n_frames=7):
 
 
 def main(args):
-
     cfg = config.cfg_from_file(args.cfg)
-    images = load_video(args.video)
-    
-    deepv2d = DeepV2D(cfg, args.model, mode=args.mode, image_dims=[None, images.shape[1], images.shape[2]],
-        use_fcrn=True, is_calibrated=False, use_regressor=False)
-   
     with tf.Session() as sess:
+        images = load_video(args.video)
+        deepv2d = DeepV2D(cfg, args.model, mode=args.mode, image_dims=[None, images.shape[1], images.shape[2]],
+        use_fcrn=True, is_calibrated=False, use_regressor=False)
         deepv2d.set_session(sess)
-        depths, poses = deepv2d(images, viz=True, iters=args.n_iters)
-
+        for i in range(args.n_frames):
+          images = load_video(args.video)
+          depths, poses = deepv2d(images, viz=True, iters=args.n_iters)
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', default='cfgs/uncalibrated.yaml', help='config file used to train the model')
     parser.add_argument('--model', default='models/uncalibrated.ckpt', help='path to model checkpoint')
@@ -90,6 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', default='keyframe', help='keyframe or global pose optimization')
     parser.add_argument('--fcrn', action="store_true", help='use fcrn for initialization')
     parser.add_argument('--n_iters', type=int, default=16, help='number of iterations to use')
+    parser.add_argument('--n_frames', type=int, default=7, help='number of video frames to use')
     args = parser.parse_args()
 
     main(args)
