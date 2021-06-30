@@ -339,6 +339,9 @@ class DeepV2D:
                     self.intrinsics_placeholder: self.intrinsics}
 
             self.depths = self.sess.run(self.outputs['depths'], feed_dict=feed_dict)
+        
+        print("Number of self.images: ", len(self.images))       
+        print("Number of self.depths: ", len(self.depths))
 
     def update_poses(self, itr=0):
         n = self.images.shape[0]
@@ -411,16 +414,7 @@ class DeepV2D:
 
                     self.depths[i:i+s] = self.sess.run(self.outputs['depths'], feed_dict=feed_dict)
 
-    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray'):
-        feed_dict = {
-            self.images_placeholder: self.images,
-            self.depths_placeholder: self.depths,
-            self.poses_placeholder: self.poses,
-            self.intrinsics_placeholder: self.intrinsics}
-
-        keyframe_image = self.images[0]
-        keyframe_depth = self.depths[0]
-
+    def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='gray'):
         # convert to disparity
         vinds = keyframe_depth>0
         depth = 1./(keyframe_depth + 1)
@@ -442,11 +436,56 @@ class DeepV2D:
 
         # Create image depth figure
         figure = np.concatenate([keyframe_image, image_depth], axis=1)
+        return figure
+
+    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray'):
+        feed_dict = {
+            self.images_placeholder: self.images,
+            self.depths_placeholder: self.depths,
+            self.poses_placeholder: self.poses,
+            self.intrinsics_placeholder: self.intrinsics}
+
+        keyframe_image = self.images[0]
+        keyframe_depth = self.depths[0]
+        
+        def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='gray'):
+            # convert to disparity
+            vinds = keyframe_depth>0
+            depth = 1./(keyframe_depth + 1)
+
+            z1 = np.percentile(depth[vinds], pc)
+            z2 = np.percentile(depth[vinds], 100-pc)
+
+            depth = (depth - z2) / (z1 - z2)
+            depth = np.clip(depth, 0, 1)
+
+            # Convert gray to rgb
+            cmap = plt.get_cmap(cmap)
+            rgba_img = cmap(depth.astype(np.float32))
+            rgb_img = np.delete(rgba_img, 3, 2)
+            depth = rgb_img
+
+            keep_H = int(depth.shape[0] * (1-crop_percent))
+            image_depth = 255 * depth[:keep_H]
+
+            # Create image depth figure
+            figure = np.concatenate([keyframe_image, image_depth], axis=1)
+            return figure
+
+        depth_image = get_depth_image(keyframe_image, keyframe_depth)
 
         # Save
-        cv2.imwrite('depth.png', image_depth[:, image_depth.shape[1]//2:])
+        cv2.imwrite('depth.png', depth_image[:, depth_image.shape[1]//2:])
         #cv2.imshow('image_depth', image_depth/255.0)
         
+        # Save all images
+        dir = '/content/video_frames/'
+        for i in range(len(self.images)):
+          print('Writing depth image '+str(i)+'...')
+          image, depth = self.images[i], self.depths[i]
+          depth_image = get_depth_image(image, depth)
+          cv2.imwrite(dir+'depth_'+str(i)+'.png', depth_image[:, depth_image.shape[1]//2:])
+
         print("Press any key to cotinue")
         cv2.waitKey()
 
@@ -480,6 +519,7 @@ class DeepV2D:
         self.deepv2d_init() 
 
         for i in range(iters):
+            print('iter: ', i)
             self.update_poses(i)    
             self.update_depths()
 

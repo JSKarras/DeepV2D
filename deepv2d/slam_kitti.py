@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import time
+import vtk
 from multiprocessing import Process, Queue
 
 from modules.depth import DepthNetwork
@@ -37,6 +38,46 @@ def pose_distance(G):
     dR = np.sqrt(np.sum(r**2))
     dt = np.sqrt(np.sum(t**2))
     return dR + dt
+
+class InteractiveViz(Process):
+    def __init__(self, queue, cinematic, render_path, clear_points, is_kitti=False):
+        super(InteractiveViz, self).__init__()
+        self.queue = queue
+        self.cinematic = cinematic
+        self.render_path = render_path
+        self.clear_points = clear_points
+        self.is_kitti = is_kitti
+
+    def run(self):
+        renderer = vtk.vtkRenderer()
+        renderer.SetBackground(0, 0, 0)
+
+        camera = vtk.vtkCamera()
+        camera.SetPosition((1, -1, -2));
+        camera.SetViewUp((0, -1, 0));
+        camera.SetFocalPoint((0, 0, 2));
+        renderer.SetActiveCamera(camera)
+
+        renwin = vtk.vtkRenderWindow()
+        renwin.SetWindowName("Point Cloud Viewer")
+        renwin.SetSize(800,600)
+        renwin.AddRenderer(renderer)
+
+        interactor = vtk.vtkRenderWindowInteractor()
+        interstyle = vtk.vtkInteractorStyleTrackballCamera()
+        interactor.SetInteractorStyle(interstyle)
+        interactor.SetRenderWindow(renwin)
+
+        interactor.Initialize()
+
+        cb = vtkTimerCallback(self.cinematic, self.render_path, self.clear_points)
+        cb.queue = self.queue
+
+        interactor.AddObserver('TimerEvent', cb.execute)
+        timerId = interactor.CreateRepeatingTimer(100);
+
+        #start the interaction and timer
+        interactor.Start()
 
 class DeepV2DSLAM_KITTI:
     def __init__(self, cfg, ckpt, n_keyframes=2, rate=2, use_fcrn=True, 
@@ -84,7 +125,7 @@ class DeepV2DSLAM_KITTI:
         self.vis_counter = 0
         
         # visualization is a Process Object
-        self.viz = vis.InteractiveViz(self.queue, cinematic, render_path, clear_points, is_kitti=True)
+        self.viz = InteractiveViz(self.queue, cinematic, render_path, clear_points, is_kitti=True)
         self.viz.start()
 
     def _create_placeholders(self):
@@ -345,21 +386,47 @@ class DeepV2DSLAM_KITTI:
     
     def display_keyframes(self):
         """ display image / depth keyframe pairs """
+        def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='gray'):
+            # convert to disparity
+            vinds = keyframe_depth>0
+            depth = 1./(keyframe_depth + 1)
 
+            z1 = np.percentile(depth[vinds], pc)
+            z2 = np.percentile(depth[vinds], 100-pc)
+
+            depth = (depth - z2) / (z1 - z2)
+            depth = np.clip(depth, 0, 1)
+
+            # Convert gray to rgb
+            cmap = plt.get_cmap(cmap)
+            rgba_img = cmap(depth.astype(np.float32))
+            rgb_img = np.delete(rgba_img, 3, 2)
+            depth = rgb_img
+
+            keep_H = int(depth.shape[0] * (1-crop_percent))
+            image_depth = 255 * depth[:keep_H]
+
+            # Create image depth figure
+            figure = np.concatenate([keyframe_image, image_depth], axis=1)
+            return figure
+
+        idx = 0
         if len(self.keyframe_inds) > 0:
             image_stack = []
             for keyframe_index in self.keyframe_inds:
                 keyframe_image = self.images[keyframe_index]
                 keyframe_depth = self.depths[keyframe_index]
 
-                image_and_depth = vis.create_image_depth_figure(keyframe_image, keyframe_depth)
+                image_and_depth = get_depth_image(keyframe_image, keyframe_depth)
                 image_stack.append(image_and_depth)
 
             image_stack = np.concatenate(image_stack, axis=0)
             if len(self.keyframe_inds) > 1:
                 image_stack = cv2.resize(image_stack, None, fx=0.5, fy=0.5)
 
-            cv2.imshow('keyframes', image_stack / 255.0)
+            #cv2.imshow('keyframes', image_stack / 255.0)
+            cv2.imwrite('/content/keyframes/keyframe_'+str(idx), image_stack / 255.0)
+            idx += 1
             cv2.waitKey(10)
 
     def track(self, image):
