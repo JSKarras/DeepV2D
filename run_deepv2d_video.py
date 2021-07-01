@@ -16,7 +16,6 @@ from core import config
 from deepv2d import DeepV2D
 
 
-
 def load_video(video_file, n_frames=8, start_idx=0):
     cap = cv2.VideoCapture(args.video)
 
