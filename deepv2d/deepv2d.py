@@ -438,7 +438,7 @@ class DeepV2D:
         figure = np.concatenate([keyframe_image, image_depth], axis=1)
         return figure
 
-    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='gray', start_idx=0):
+    def vizualize_output(self, inds=[0], pc=98, crop_percent=0, normalizer=None, cmap='binary', start_idx=0):
         feed_dict = {
             self.images_placeholder: self.images,
             self.depths_placeholder: self.depths,
@@ -448,7 +448,7 @@ class DeepV2D:
         keyframe_image = self.images[0]
         keyframe_depth = self.depths[0]
         
-        def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='gray'):
+        def get_depth_image(keyframe_image, keyframe_depth, pc=98, crop_percent=0, normalizer=None, cmap='binary'):
             # convert to disparity
             vinds = keyframe_depth>0
             depth = 1./(keyframe_depth + 1)
@@ -460,7 +460,8 @@ class DeepV2D:
             depth = np.clip(depth, 0, 1)
 
             # Convert gray to rgb
-            cmap = plt.get_cmap(cmap)
+            print("CMAP = ", cmap)
+            cmap = plt.get_cmap('viridis')
             rgba_img = cmap(depth.astype(np.float32))
             rgb_img = np.delete(rgba_img, 3, 2)
             depth = rgb_img
@@ -472,7 +473,7 @@ class DeepV2D:
             figure = np.concatenate([keyframe_image, image_depth], axis=1)
             return figure
 
-        depth_image = get_depth_image(keyframe_image, keyframe_depth)
+        depth_image = get_depth_image(keyframe_image, keyframe_depth, cmap=cmap)
 
         # Save
         cv2.imwrite('depth.png', depth_image[:, depth_image.shape[1]//2:])
@@ -496,7 +497,7 @@ class DeepV2D:
         #vis.visualize_prediction(point_cloud, point_colors, self.poses)
 
 
-    def __call__(self, images, intrinsics=None, iters=5, viz=False, start_idx=0):
+    def __call__(self, images, intrinsics=None, iters=5, viz=False, start_idx=0, cmap='binary'):
         n_frames = len(images)
         self.images = np.stack(images, axis=0)
 
@@ -524,7 +525,7 @@ class DeepV2D:
             self.update_depths()
 
         if viz:
-            self.vizualize_output(start_idx=start_idx)
+            self.vizualize_output(start_idx=start_idx, cmap=cmap)
 
         return self.depths, self.poses
 

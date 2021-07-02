@@ -82,7 +82,7 @@ def main(args):
           start_idx = 7*i
           print("Frames Batch #", i+1, ": frames ", start_idx, " - ", start_idx+7)
           images = all_images[start_idx:start_idx+7]
-          depths, poses = deepv2d(images, viz=True, iters=args.n_iters, start_idx=start_idx)
+          depths, poses = deepv2d(images, viz=True, iters=args.n_iters, start_idx=start_idx, cmap=args.cmap)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -95,6 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('--fcrn', action="store_true", help='use fcrn for initialization')
     parser.add_argument('--n_iters', type=int, default=16, help='number of iterations to use')
     parser.add_argument('--n_frames', type=int, default=7, help='number of video frames to use')
+    parser.add_argument('--cmap', default="binary", help='color map to use for depth visualization')
     args = parser.parse_args()
 
     main(args)
